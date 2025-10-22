@@ -1,0 +1,10 @@
+inurl:wp-config.php
+filetype:sql "wordpress"
+intitle:"index of" wp-content
+inurl:admin login
+filetype:env DB_PASSWORD
+intitle:"index of" /backup
+inurl:config.php db_password
+filetype:log "error" "password"
+intitle:"phpinfo" "PHP Version"
+inurl:/.git/index
