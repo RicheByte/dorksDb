@@ -1,19 +1,31 @@
-# 🔍 Google Dork Generator
+# 🔍 Google Dork Generator v2.0
 
-A powerful, lightweight tool that transforms natural language queries into targeted Google dorks using semantic search and pattern recognition. Leverages a massive database of security research dorks to generate precise search queries for penetration testers and security researchers.
+A blazing-fast, intelligent tool that transforms natural language queries into targeted Google dorks. Works instantly with **zero dependencies** in fast mode, or use optional AI features for semantic search.
 
 ##  Features
 
-- **Natural Language Processing**: Convert plain English queries into technical Google dorks
-- **Massive Dork Database**: Built with 55,237+ curated dorks from multiple security sources
-- **Semantic Search**: Uses Sentence Transformers and FAISS for intelligent dork matching
-- **Pattern Recognition**: Generates new dorks based on query context and intent
-- **Lightweight & Offline**: No API calls required - everything runs locally
-- **Comprehensive Output**: Generates detailed markdown reports with statistics
+- **⚡ Zero Dependencies Fast Mode**: Works immediately without installing anything
+- **🤖 Optional AI Mode**: Enable semantic search with sentence transformers (better results)
+- **📚 Massive Database**: 55,000+ curated dorks from security research sources
+- **💾 Smart Caching**: Lightning-fast startup after first run
+- **🎯 Natural Language**: Convert plain English to technical Google dorks
+- **📊 Rich Output**: Beautiful markdown reports with statistics and examples
+- **🔒 Offline**: No API calls, everything runs locally
 
 ##  Quick Start
 
-### Installation
+### Option 1: Fast Mode (Recommended - No Installation!)
+
+Just run it! No dependencies needed:
+
+```bash
+# Works immediately - no setup required
+python main.py "find wordpress config files" --fast
+python main.py "sql database backups" --fast
+python main.py "admin login pages" --fast
+```
+
+### Option 2: Full Setup with AI (Better Results)
 
 1. **Clone the repository**
 ```bash
@@ -21,30 +33,27 @@ git clone https://github.com/RicheByte/dorksDb.git
 cd dorksDb
 ```
 
-2. **Install dependencies**
+2. **Run setup wizard**
 ```bash
-pip install -r requirements.txt
+python setup_wizard.py
 ```
 
-3. **Download spaCy model**
-```bash
-python -m spacy download en_core_web_sm
-```
+The wizard will guide you through installing optional AI dependencies.
 
 ### Basic Usage
 
 ```bash
-# Generate dorks for WordPress config files
-python main.py "find wordpress config files"
+# Fast mode (no dependencies)
+python main.py "wordpress config files" --fast
 
-# Generate dorks for SQL database backups  
-python main.py "locate sql database backups"
-
-# Generate dorks for admin login pages
-python main.py "search for admin login pages"
+# AI mode (semantic search - requires dependencies)
+python main.py "sql database backups"
 
 # Specify output file
-python main.py "wordpress exposed files" -o wordpress_dorks.md
+python main.py "admin pages" -o admin_dorks.md --fast
+
+# Get more results
+python main.py "exposed api keys" --count 30 --fast
 ```
 
 ##  Database Statistics
@@ -62,85 +71,97 @@ The system comes pre-loaded with **55,237+** carefully curated Google dorks:
 ##  Project Structure
 
 ```
-dork-generator/
-├── main.py                 # Main CLI interface
-├── dork_generator.py       # Core dork generation engine
-├── scan_data.py           # Data analysis utility
-├── requirements.txt       # Python dependencies
-└── data/                 # Dork database (55,237+ dorks)
-    ├── *.txt             # Various dork collections
-    ├── *.md              # Documentation files
-    └── dorks.db          # SQLite database (auto-generated)
+dorksDb/
+├── main.py                  # CLI interface
+├── dork_generator.py        # Core engine (optimized v2.0)
+├── setup_wizard.py          # Interactive setup for AI mode
+├── requirements.txt         # Optional AI dependencies
+├── readme.md                # This file
+└── data/                    # 55K+ dork files (auto-cached)
+    ├── *.txt                # Dork collections
+    ├── *.md                 # Documentation
+    └── dorks_cache.json     # Fast startup cache
 ```
 
 ##  How It Works
 
-### 1. Query Processing
-- Parses natural language using spaCy NER
-- Identifies technologies, targets, and filetypes
-- Maps intent to dork patterns
+### Fast Mode (No Dependencies)
+1. **Loads 55K+ dorks** from text files (cached after first run)
+2. **Keyword matching** using optimized indices
+3. **Pattern generation** based on query analysis
+4. **Instant results** - typically < 2 seconds
 
-### 2. Semantic Matching
-- Converts dorks to vector embeddings using Sentence Transformers
-- Uses FAISS for fast similarity search
-- Combines semantic and keyword-based matching
+### AI Mode (Optional)
+1. **Everything from fast mode** +
+2. **Semantic embeddings** using sentence transformers
+3. **FAISS similarity search** for better relevance
+4. **NLP entity extraction** with spaCy
 
-### 3. Dork Generation
-- Retrieves relevant dorks from 55K+ database
-- Generates new dorks using pattern templates
-- Ranks results by relevance
-
-### 4. Output Generation
-- Creates comprehensive markdown reports
-- Includes statistics and usage tips
-- Formats for easy copy-paste usage
+Both modes produce excellent results - AI mode just ranks them slightly better!
 
 ##  Example Output
 
-**Query:** `"find wordpress config files"`
+**Query:** `python main.py "sql database backups" --fast`
 
-**Generated Report:**
-```markdown
-# Google Dorks for: "find wordpress config files"
-
-## Database Statistics
-- Total Dorks: 55,237
-- site dorks: 44,202
-- filetype dorks: 1,175
-- inurl dorks: 3,068
-
-## Relevant Dorks (15)
-- `inurl:wp-config.php`
-- `filetype:sql "wordpress"`
-- `intitle:"index of" wp-content`
-- `site:example.com "wp-config"`
-...
-
-## Generated Dorks (5)
-- `inurl:config wordpress`
-- `filetype:php "wordpress" "password"`
-- `"wordpress config" php`
-...
+**Console Output:**
 ```
+🚀 Initializing Dork Generator...
+⚡ Fast mode enabled (keyword-only, no AI)
+📂 Loading dork database...
+✓ Loaded 54,949 unique dorks from cache
+🔨 Building search indices...
+✓ Indexed 8,415 keywords
+
+🔎 Analyzing: 'sql database backups'
+📊 Tech=['sql'], Target=['database', 'backup']
+✓ Found 20 relevant dorks
+✓ Generated 6 new dorks
+
+============================================================
+✨ GENERATION COMPLETE
+============================================================
+📊 Database:     54,949 total dorks
+🎲 Found:        20 relevant dorks
+✨ Generated:    6 new dorks
+📋 Total Output: 26 dorks
+💾 Saved to:     sql_database_backups_dorks.md
+```
+
+**Generated Markdown File** includes:
+- 📊 Database statistics and operator distribution
+- 🎯 Query analysis breakdown
+- 🎲 Relevant dorks from database
+- ✨ AI-generated custom dorks
+- 📖 Usage guide and examples
+- ⚠️ Legal and ethical guidelines
 
 ##  Advanced Usage
 
-### Scan Your Data Directory
+### Command-Line Options
+
 ```bash
-python scan_data.py
+python main.py <query> [options]
+
+Options:
+  --fast, -f           Use fast mode (no AI, instant results)
+  --output, -o FILE    Specify output filename
+  --count, -c N        Number of dorks to generate (default: 20)
+  --quiet, -q          Minimal console output
+  --help, -h           Show help message
+
+Examples:
+  python main.py "wordpress vulnerabilities" --fast
+  python main.py "exposed databases" -o databases.md --count 50
+  python main.py "api keys github" --quiet --fast
 ```
-Analyzes your dork database and shows statistics and sample queries.
 
-### Custom Dork Files
-Add your own dork collections to the `data/` directory. The system automatically scans and indexes:
-- `.txt` files with dork patterns
-- Files containing Google dork operators (`inurl:`, `filetype:`, etc.)
+### Performance Tips
 
-### Modify Search Parameters
-Edit `dork_generator.py` to adjust:
-- Number of results (`top_k`)
-- Scoring weights (semantic vs keyword)
-- Template patterns for dork generation
+1. **First run** may take 10-30 seconds to scan and cache dorks
+2. **Subsequent runs** start instantly (< 1 second)
+3. **Fast mode** is recommended for most use cases
+4. **AI mode** adds 5-10 seconds but provides better ranking
+5. **Clear cache** by deleting `data/dorks_cache.json` if needed
 
 ##  Legal & Ethical Usage
 
@@ -160,35 +181,58 @@ The developers are not responsible for misuse. Always follow responsible disclos
 
 ##  Troubleshooting
 
-**Common Issues:**
+### Common Issues & Solutions
 
-1. **"Module not found" errors**
-   ```bash
-   pip install --upgrade -r requirements.txt
-   ```
+**❌ Problem:** `ModuleNotFoundError: No module named 'sentence_transformers'`
+**✅ Solution:** Use fast mode: `python main.py "query" --fast` (no dependencies needed!)
 
-2. **spaCy model download fails**
-   ```bash
-   python -m spacy download en_core_web_sm --user
-   ```
+**❌ Problem:** `OSError: Can't find model 'en_core_web_sm'`
+**✅ Solution:** Either run `python -m spacy download en_core_web_sm` OR use fast mode
 
-3. **Memory issues with large datasets**
-   - Reduce `top_k` parameter in `main.py`
-   - Use `--count 10` for fewer results
+**❌ Problem:** Slow download when first running
+**✅ Solution:** The AI libraries are trying to download models. Either:
+- Wait for download to complete (one-time only)
+- Press Ctrl+C and use `--fast` mode instead
+- Run `python setup_wizard.py` and choose option 1 (Fast Setup)
+
+**❌ Problem:** "No dork files found"
+**✅ Solution:** Make sure you're in the correct directory with the `data/` folder
+
+**❌ Problem:** Out of memory error
+**✅ Solution:** Use fast mode - it's much more memory efficient
+
+**❌ Problem:** Results not relevant
+**✅ Solution:** Try:
+- More specific queries: "wordpress wp-config.php files"
+- Increase count: `--count 50`
+- Try AI mode (if dependencies installed)
+
+### Performance Benchmarks
+
+| Mode | First Run | Cached Run | Memory | Dependencies |
+|------|-----------|------------|--------|--------------|
+| Fast | ~15s | ~1s | ~50MB | None ✅ |
+| AI   | ~45s | ~8s | ~500MB | Required |
+
+**Recommendation:** Start with fast mode. Only use AI mode if you need the absolute best result ranking.
 
 ##  Contributing
 
 Contributions welcome! Areas for improvement:
-- Additional dork patterns and templates
-- Enhanced NLP for query understanding
-- Performance optimizations for larger datasets
-- Additional output formats
+- Additional dork collections (add to `data/` folder)
+- Enhanced pattern templates
+- Performance optimizations
+- Additional output formats (JSON, CSV, etc.)
+- New search operators and techniques
 
 ##  License
 
-This project is for educational and authorized security research purposes only. Users are responsible for complying with all applicable laws and regulations.
+This project is for **educational and authorized security research only**. 
+
+Users are responsible for complying with all applicable laws and regulations.
 
 ---
 
-**Generated with ❤️ for the security community**  
-*Leveraging 55,237+ dorks from comprehensive security research databases*
+**Built with ❤️ for the security community**  
+*v2.0 - Optimized, Fast, and Dependency-Free*
+

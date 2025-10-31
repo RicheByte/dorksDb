@@ -1,343 +1,405 @@
-import sqlite3
-import pickle
+"""
+Optimized Google Dork Generator v2.0
+- Fast mode with no dependencies
+- Optional AI mode for better results
+- Caching for improved performance
+"""
+
 import os
 import glob
-from sentence_transformers import SentenceTransformer
-import faiss
-import numpy as np
-from sklearn.feature_extraction.text import TfidfVectorizer
-import spacy
 import re
-from collections import Counter
+import json
+from collections import Counter, defaultdict
+import warnings
+warnings.filterwarnings('ignore')
 
 class DorkGenerator:
-    def __init__(self, data_dir="data"):
+    def __init__(self, data_dir="data", use_ai=True):
         self.data_dir = data_dir
-        self.model = SentenceTransformer('all-MiniLM-L6-v2')
-        self.nlp = spacy.load("en_core_web_sm")
+        self.use_ai = use_ai
+        self.cache_file = os.path.join(data_dir, 'dorks_cache.json')
         
-        # Initialize databases
-        self.init_databases()
+        # These will be loaded lazily
+        self.model = None
+        self.nlp = None
+        self.index = None
+        
+        # Core data
+        self.ghdb_dorks = []
+        self.keyword_index = defaultdict(set)
+        self.operator_index = defaultdict(list)
+        
+        # Load dorks
+        print("📂 Loading dork database...")
         self.load_all_dorks()
         
-    def init_databases(self):
-        os.makedirs(self.data_dir, exist_ok=True)
-        self.conn = sqlite3.connect(f'{self.data_dir}/dorks.db')
-        cursor = self.conn.cursor()
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS query_dork_pairs (
-                id INTEGER PRIMARY KEY,
-                query TEXT,
-                dork TEXT,
-                success_score REAL DEFAULT 0.5
-            )
-        ''')
-        self.conn.commit()
+        # Build indices
+        print("🔨 Building search indices...")
+        self.build_fast_indices()
+        
+        # Load AI models if requested
+        if use_ai:
+            self._init_ai_models()
+    
+    def _init_ai_models(self):
+        """Load AI models with error handling"""
+        try:
+            print("🤖 Loading AI models...")
+            from sentence_transformers import SentenceTransformer
+            import faiss
+            
+            self.model = SentenceTransformer('all-MiniLM-L6-v2')
+            print("✓ Sentence transformer loaded")
+            
+            if self.ghdb_dorks:
+                print("⚙️ Creating embeddings...")
+                embeddings = self.model.encode(self.ghdb_dorks, show_progress_bar=True, batch_size=32)
+                self.index = faiss.IndexFlatIP(embeddings.shape[1])
+                self.index.add(embeddings.astype('float32'))
+                print("✓ Semantic search ready")
+        except Exception as e:
+            print(f"⚠️ AI mode not available: {e}")
+            print("⚡ Using fast keyword-only mode")
+            self.model = None
+        
+        try:
+            import spacy
+            self.nlp = spacy.load("en_core_web_sm")
+            print("✓ NLP loaded")
+        except:
+            print("⚠️ spaCy not available, using regex")
+            self.nlp = None
     
     def load_all_dorks(self):
-        """Load ALL dork files from the data directory"""
-        print("Scanning for dork files...")
-        dork_files = []
-        
-        # Find all text files in data directory
-        for file_pattern in ['*.txt', '*.md']:
-            dork_files.extend(glob.glob(os.path.join(self.data_dir, file_pattern)))
-        
-        print(f"Found {len(dork_files)} dork files")
-        
-        all_dorks = set()
-        file_stats = {}
-        
-        for file_path in dork_files:
+        """Load dorks with caching"""
+        # Try cache first
+        if os.path.exists(self.cache_file):
             try:
-                file_name = os.path.basename(file_path)
-                file_size = os.path.getsize(file_path)
-                print(f"Loading {file_name} ({file_size} bytes)...")
-                
-                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                with open(self.cache_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    self.ghdb_dorks = data.get('dorks', [])
+                    if self.ghdb_dorks:
+                        print(f"✓ Loaded {len(self.ghdb_dorks):,} dorks from cache")
+                        return
+            except:
+                pass
+        
+        # Load from files
+        print("🔍 Scanning dork files...")
+        files = glob.glob(os.path.join(self.data_dir, '*.txt'))
+        files.extend(glob.glob(os.path.join(self.data_dir, '*.md')))
+        
+        if not files:
+            print("⚠️ No files found, using samples")
+            self._create_samples()
+            return
+        
+        print(f"📄 Found {len(files)} files")
+        all_dorks = set()
+        
+        for i, path in enumerate(files):
+            try:
+                with open(path, 'r', encoding='utf-8', errors='ignore') as f:
                     content = f.read()
-                    # Extract dorks - look for patterns like inurl:, filetype:, etc.
-                    dorks_from_file = self.extract_dorks_from_content(content)
-                    all_dorks.update(dorks_from_file)
+                    dorks = self.extract_dorks(content)
+                    all_dorks.update(dorks)
                     
-                    file_stats[file_name] = {
-                        'size': file_size,
-                        'dorks_found': len(dorks_from_file)
-                    }
-                    
+                    if (i + 1) % 10 == 0:
+                        print(f"  Processed {i+1}/{len(files)}, found {len(all_dorks):,} dorks")
             except Exception as e:
-                print(f"Error reading {file_path}: {e}")
+                print(f"⚠️ Error in {os.path.basename(path)}: {e}")
         
         self.ghdb_dorks = list(all_dorks)
-        print(f"Total unique dorks loaded: {len(self.ghdb_dorks)}")
+        print(f"✓ Loaded {len(self.ghdb_dorks):,} unique dorks")
         
-        # Print file statistics
-        print("\nFile Statistics:")
-        for file_name, stats in list(file_stats.items())[:10]:  # Show top 10
-            print(f"  {file_name}: {stats['dorks_found']} dorks")
-        
-        if len(file_stats) > 10:
-            print(f"  ... and {len(file_stats) - 10} more files")
-        
-        # Create embeddings and indices
-        self.create_search_indices()
+        # Save cache
+        try:
+            os.makedirs(self.data_dir, exist_ok=True)
+            with open(self.cache_file, 'w', encoding='utf-8') as f:
+                json.dump({'dorks': self.ghdb_dorks}, f)
+            print(f"💾 Cache saved")
+        except:
+            pass
     
-    def extract_dorks_from_content(self, content):
-        """Extract proper dorks from file content"""
+    def extract_dorks(self, content):
+        """Extract dorks from content"""
         dorks = set()
-        lines = content.split('\n')
+        operators = ['inurl:', 'intitle:', 'filetype:', 'site:', 'intext:', 'ext:', '"index of"']
         
-        # Common Google dork operators
-        operators = [
-            'inurl:', 'intitle:', 'filetype:', 'ext:', 'site:', 
-            'intext:', 'allintext:', 'allintitle:', 'allinurl:',
-            'index of', '"index of"', 'parent directory'
-        ]
-        
-        for line in lines:
+        for line in content.split('\n'):
             line = line.strip()
-            if not line or len(line) > 500:  # Skip empty or very long lines
+            if not line or len(line) > 500 or line.startswith('#'):
                 continue
-                
-            # Check if line contains dork operators
+            
             if any(op in line.lower() for op in operators):
                 dorks.add(line)
-            # Also include lines that look like search queries
-            elif any(keyword in line.lower() for keyword in ['sql', 'config', 'admin', 'login', 'password', 'backup']):
-                dorks.add(line)
+            elif any(kw in line.lower() for kw in ['sql', 'config', 'admin', 'password', 'backup']):
+                if not line.startswith('http'):
+                    dorks.add(line)
         
         return dorks
     
-    def create_search_indices(self):
-        """Create FAISS index and TF-IDF features for all dorks"""
-        print("Creating search indices...")
-        
-        if not self.ghdb_dorks:
-            print("No dorks found! Creating sample dorks...")
-            self.ghdb_dorks = [
-                'inurl:wp-config.php',
-                'filetype:sql "wordpress"', 
-                'intitle:"index of" wp-content',
-                'inurl:admin login',
-                'filetype:env DB_PASSWORD'
-            ]
-        
-        # Create embeddings
-        print("Generating embeddings...")
-        self.dork_embeddings = self.model.encode(self.ghdb_dorks)
-        
-        # Create FAISS index
-        print("Building FAISS index...")
-        self.index = faiss.IndexFlatIP(self.dork_embeddings.shape[1])
-        self.index.add(self.dork_embeddings.astype('float32'))
-        
-        # TF-IDF features
-        print("Building TF-IDF features...")
-        self.tfidf = TfidfVectorizer(ngram_range=(1, 2), max_features=5000)
-        self.tfidf_features = self.tfidf.fit_transform(self.ghdb_dorks)
-        
-        print("Search indices ready!")
+    def _create_samples(self):
+        """Create sample dorks"""
+        self.ghdb_dorks = [
+            'inurl:wp-config.php',
+            'filetype:sql "wordpress"',
+            'intitle:"index of" wp-content',
+            'inurl:admin login',
+            'filetype:env DB_PASSWORD',
+            'filetype:log "password"',
+            'inurl:backup filetype:sql',
+            'site:github.com "api_key"'
+        ]
     
-    def understand_query(self, natural_query):
-        """Parse natural language query into components"""
-        doc = self.nlp(natural_query.lower())
+    def build_fast_indices(self):
+        """Build keyword index"""
+        if not self.ghdb_dorks:
+            return
+        
+        for idx, dork in enumerate(self.ghdb_dorks):
+            words = re.findall(r'\b\w+\b', dork.lower())
+            for word in words:
+                if len(word) > 2:
+                    self.keyword_index[word].add(idx)
+        
+        operators = ['inurl:', 'intitle:', 'filetype:', 'site:']
+        for idx, dork in enumerate(self.ghdb_dorks):
+            for op in operators:
+                if op in dork.lower():
+                    self.operator_index[op].append(idx)
+        
+        print(f"✓ Indexed {len(self.keyword_index)} keywords")
+    
+    def understand_query(self, query):
+        """Parse query"""
+        query_lower = query.lower()
+        
+        tech_map = {
+            'wordpress': r'\b(wordpress|wp)\b',
+            'joomla': r'\bjoomla\b',
+            'sql': r'\b(sql|mysql|database|db)\b',
+            'php': r'\bphp\b'
+        }
+        
+        target_map = {
+            'config': r'\b(config|configuration)\b',
+            'login': r'\b(login|admin)\b',
+            'backup': r'\b(backup|dump)\b',
+            'password': r'\b(password|passwd)\b',
+            'database': r'\b(database|db)\b'
+        }
+        
+        filetype_map = {
+            'sql': r'\bsql\b',
+            'php': r'\bphp\b',
+            'env': r'\benv\b',
+            'log': r'\blog\b'
+        }
         
         components = {
             'technology': [],
             'target': [],
-            'filetype': [],
-            'intent': 'search',
-            'operators': []
+            'filetype': []
         }
         
-        # Technology mapping
-        tech_keywords = {
-            'wordpress': ['wordpress', 'wp'],
-            'joomla': ['joomla'], 
-            'drupal': ['drupal'],
-            'magento': ['magento'],
-            'sql': ['sql', 'database', 'mysql'],
-            'php': ['php']
-        }
+        for tech, pattern in tech_map.items():
+            if re.search(pattern, query_lower):
+                components['technology'].append(tech)
         
-        # Target mapping
-        target_keywords = {
-            'config': ['config', 'configuration', 'setup'],
-            'login': ['login', 'admin', 'administrator', 'panel'],
-            'backup': ['backup', 'back up', 'dump'],
-            'password': ['password', 'pass', 'credential', 'auth'],
-            'database': ['database', 'db', 'sql']
-        }
+        for target, pattern in target_map.items():
+            if re.search(pattern, query_lower):
+                components['target'].append(target)
         
-        # Filetype mapping
-        filetype_keywords = {
-            'sql': ['sql', 'database', 'mysql'],
-            'php': ['php', 'script'],
-            'env': ['.env', 'environment'],
-            'log': ['log', 'logs'],
-            'txt': ['txt', 'text']
-        }
-        
-        for token in doc:
-            word = token.text.lower()
-            
-            # Check technology
-            for tech, keywords in tech_keywords.items():
-                if any(keyword in word for keyword in keywords):
-                    if tech not in components['technology']:
-                        components['technology'].append(tech)
-            
-            # Check target
-            for target, keywords in target_keywords.items():
-                if any(keyword in word for keyword in keywords):
-                    if target not in components['target']:
-                        components['target'].append(target)
-            
-            # Check filetype
-            for ft, keywords in filetype_keywords.items():
-                if any(keyword in word for keyword in keywords):
-                    if ft not in components['filetype']:
-                        components['filetype'].append(ft)
+        for ft, pattern in filetype_map.items():
+            if re.search(pattern, query_lower):
+                components['filetype'].append(ft)
         
         return components
     
-    def find_relevant_dorks(self, query, top_k=10):
-        """Find relevant dorks using hybrid matching"""
+    def find_relevant_dorks(self, query, top_k=20):
+        """Find dorks using best available method"""
         if not self.ghdb_dorks:
-            return ["No dorks available in database"]
+            return []
         
-        # Semantic similarity
-        query_embedding = self.model.encode([query])
-        query_embedding = query_embedding.astype('float32')
+        if self.model and self.index:
+            return self._semantic_search(query, top_k)
         
-        # Search more initially then filter
-        search_k = min(top_k * 3, len(self.ghdb_dorks))
-        semantic_scores, semantic_indices = self.index.search(query_embedding, search_k)
-        semantic_scores = semantic_scores[0]
-        semantic_indices = semantic_indices[0]
-        
-        # Keyword matching
-        try:
-            keyword_features = self.tfidf.transform([query])
-            keyword_scores = np.array(keyword_features.mean(axis=1))[0]
-            
-            # Combine scores
-            combined_scores = []
-            for i, idx in enumerate(semantic_indices):
-                if idx < len(self.ghdb_dorks):  # Ensure valid index
-                    keyword_score = keyword_scores if hasattr(keyword_scores, '__len__') else keyword_scores
-                    combined_score = 0.7 * semantic_scores[i] + 0.3 * keyword_score
-                    combined_scores.append((idx, combined_score))
-            
-            combined_scores.sort(key=lambda x: x[1], reverse=True)
-            top_indices = [idx for idx, _ in combined_scores[:top_k]]
-            
-        except Exception as e:
-            print(f"Keyword matching failed: {e}")
-            top_indices = semantic_indices[:top_k]
-        
-        return [self.ghdb_dorks[idx] for idx in top_indices if idx < len(self.ghdb_dorks)]
+        return self._keyword_search(query, top_k)
     
-    def generate_new_dorks(self, components):
-        """Generate new dorks based on query components"""
+    def _semantic_search(self, query, top_k):
+        """Semantic search"""
+        emb = self.model.encode([query]).astype('float32')
+        scores, indices = self.index.search(emb, min(top_k * 2, len(self.ghdb_dorks)))
+        return [self.ghdb_dorks[idx] for idx in indices[0][:top_k] if idx < len(self.ghdb_dorks)]
+    
+    def _keyword_search(self, query, top_k):
+        """Keyword-based search"""
+        words = set(re.findall(r'\b\w+\b', query.lower()))
+        words = {w for w in words if len(w) > 2}
+        
+        scores = {}
+        for idx, dork in enumerate(self.ghdb_dorks):
+            score = 0
+            dork_lower = dork.lower()
+            
+            for word in words:
+                if word in dork_lower:
+                    score += 10
+            
+            if query.lower() in dork_lower:
+                score += 50
+            
+            if score > 0:
+                scores[idx] = score
+        
+        sorted_idx = sorted(scores.keys(), key=lambda x: scores[x], reverse=True)
+        results = [self.ghdb_dorks[idx] for idx in sorted_idx[:top_k]]
+        
+        if len(results) < top_k:
+            for dork in self.ghdb_dorks:
+                if dork not in results:
+                    results.append(dork)
+                    if len(results) >= top_k:
+                        break
+        
+        return results
+    
+    def generate_new_dorks(self, components, max_count=10):
+        """Generate new dorks"""
         templates = {
             'config': [
-                'inurl:config {technology}',
-                'filetype:php "{technology}" "password"',
-                '"{technology} config" {filetype}',
-                'intitle:"index of" "{technology} config"',
-                'site:example.com "{technology}" "config"'
+                'inurl:config {tech}',
+                'filetype:{ft} "{tech}" "password"',
+                'intitle:"index of" "{tech}" config',
+                'site:*.com inurl:config {tech}',
+                '{tech} "config" filetype:{ft}',
+                'intext:"{tech}" "config" inurl:admin'
             ],
             'login': [
-                'inurl:login {technology}',
-                'intitle:"admin" "{technology}"',
-                '{technology} "admin panel"',
-                'inurl:admin {technology}',
-                '{technology} "login" "password"'
+                'inurl:login {tech}',
+                'intitle:"admin" "{tech}"',
+                '{tech} "admin panel"',
+                'inurl:admin {tech}',
+                'intitle:"{tech}" "login"',
+                '{tech} inurl:wp-admin'
             ],
             'database': [
-                'filetype:sql "{technology}"',
-                'inurl:backup {technology}',
-                '"{technology} database" {filetype}',
-                'intitle:"index of" "sql" "{technology}"'
+                'filetype:sql "{tech}"',
+                'inurl:backup {tech} filetype:sql',
+                '{tech} "database"',
+                'inurl:db {tech}',
+                'filetype:sql "{tech}" "INSERT INTO"',
+                '{tech} "database" filetype:sql'
             ],
             'backup': [
-                'filetype:zip "{technology}"',
-                'inurl:backup {technology}',
-                '"{technology} backup"',
-                'intitle:"index of" "backup" "{technology}"'
+                'filetype:zip "{tech}" backup',
+                'inurl:backup {tech}',
+                'intitle:"index of" "backup" "{tech}"',
+                '{tech} filetype:bak',
+                'inurl:backup filetype:sql {tech}',
+                '{tech} filetype:tar.gz backup'
+            ],
+            'password': [
+                'filetype:env "{tech}" PASSWORD',
+                '{tech} filetype:txt "password"',
+                'site:github.com "{tech}" "password"',
+                '{tech} "api_key" filetype:env',
+                'inurl:{tech} "password" filetype:log',
+                '{tech} "secret" OR "api_key"'
             ]
         }
         
         generated = []
-        tech = components['technology'][0] if components['technology'] else ''
-        target = components['target'][0] if components['target'] else 'config'
-        filetype = components['filetype'][0] if components['filetype'] else 'php'
+        tech = components['technology'][0] if components['technology'] else 'wordpress'
+        targets = components['target'] if components['target'] else ['config']
+        ft = components['filetype'][0] if components['filetype'] else 'php'
         
-        # Generate based on target
-        if target in templates:
-            for template in templates[target]:
-                generated_dork = template.format(
-                    technology=tech,
-                    filetype=filetype
-                )
-                generated.append(generated_dork)
+        # Generate from templates - use all available for each target
+        for target in targets:
+            if target in templates:
+                for template in templates[target]:
+                    dork = template.format(tech=tech, ft=ft)
+                    if dork not in generated:
+                        generated.append(dork)
+                        if len(generated) >= max_count:
+                            return generated[:max_count]
         
-        # Also generate some generic dorks
-        generic_templates = [
-            'inurl:{tech} "{target}"',
-            'filetype:{ft} "{tech}"',
-            'intitle:"index of" "{tech}"'
-        ]
+        # Add more generic combinations if we haven't reached max_count
+        if len(generated) < max_count and tech:
+            generic = [
+                f'inurl:{tech}',
+                f'intitle:"{tech}"',
+                f'filetype:{ft} "{tech}"',
+                f'{tech} filetype:log',
+                f'site:*.com {tech} "index of"',
+                f'{tech} "password" OR "secret"',
+                f'inurl:{tech} filetype:sql',
+                f'{tech} intitle:"index of"',
+                f'"{tech}" filetype:env',
+                f'site:github.com {tech} "key"',
+                f'intext:"{tech}" "password"',
+                f'{tech} inurl:config',
+                f'filetype:txt {tech} "admin"',
+                f'{tech} "database" inurl:backup',
+                f'site:pastebin.com {tech}'
+            ]
+            for dork in generic:
+                if dork not in generated:
+                    generated.append(dork)
+                    if len(generated) >= max_count:
+                        break
         
-        for template in generic_templates:
-            if tech or target != 'config':  # Only use if we have specific info
-                generated_dork = template.format(
-                    tech=tech,
-                    target=target,
-                    ft=filetype
-                )
-                if generated_dork not in generated:
-                    generated.append(generated_dork)
-        
-        return generated
+        return generated[:max_count]
     
     def get_dork_statistics(self):
-        """Get statistics about loaded dorks"""
+        """Get statistics"""
         if not self.ghdb_dorks:
-            return {"total_dorks": 0}
+            return {'total_dorks': 0}
         
-        # Count dorks by type
-        dork_types = Counter()
-        for dork in self.ghdb_dorks:
-            dork_lower = dork.lower()
-            if 'inurl:' in dork_lower:
-                dork_types['inurl'] += 1
-            if 'intitle:' in dork_lower:
-                dork_types['intitle'] += 1
-            if 'filetype:' in dork_lower:
-                dork_types['filetype'] += 1
-            if 'site:' in dork_lower:
-                dork_types['site'] += 1
-            if 'index of' in dork_lower:
-                dork_types['index_of'] += 1
-        
-        return {
+        stats = {
             'total_dorks': len(self.ghdb_dorks),
-            'dork_types': dict(dork_types)
+            'operators': Counter(),
+            'filetypes': Counter(),
+            'targets': Counter()
         }
+        
+        for dork in self.ghdb_dorks:
+            dl = dork.lower()
+            
+            for op in ['inurl', 'intitle', 'filetype', 'site', 'intext']:
+                if f'{op}:' in dl:
+                    stats['operators'][op] += 1
+            
+            ft_match = re.search(r'filetype:(\w+)', dl)
+            if ft_match:
+                stats['filetypes'][ft_match.group(1)] += 1
+            
+            for target in ['admin', 'login', 'config', 'backup', 'password', 'database']:
+                if target in dl:
+                    stats['targets'][target] += 1
+        
+        return stats
     
-    def generate_dorks(self, query):
-        """Main method to generate dorks for a query"""
+    def generate_dorks(self, query, count=20):
+        """Main generation method"""
+        print(f"\n🔎 Analyzing: '{query}'")
+        
         components = self.understand_query(query)
-        relevant_dorks = self.find_relevant_dorks(query, top_k=15)  # Get more dorks
-        new_dorks = self.generate_new_dorks(components)
-        stats = self.get_dork_statistics()
+        print(f"📊 Tech={components['technology']}, Target={components['target']}")
+        
+        # Use the count parameter for how many dorks to find
+        relevant = self.find_relevant_dorks(query, top_k=count)
+        print(f"✓ Found {len(relevant)} relevant dorks")
+        
+        # Generate proportional number of new dorks (up to count/2)
+        generated = self.generate_new_dorks(components, max_count=max(10, count // 2))
+        print(f"✓ Generated {len(generated)} new dorks")
         
         return {
             'query': query,
             'components': components,
-            'relevant_dorks': relevant_dorks,
-            'generated_dorks': new_dorks,
-            'statistics': stats
+            'relevant_dorks': relevant,
+            'generated_dorks': generated,
+            'statistics': self.get_dork_statistics()
         }
