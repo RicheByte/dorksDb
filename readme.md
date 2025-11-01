@@ -1,16 +1,16 @@
-# 🔍 Google Dork Generator v2.0
+#  Google Dork Generator v2.0
 
 A blazing-fast, intelligent tool that transforms natural language queries into targeted Google dorks. Works instantly with **zero dependencies** in fast mode, or use optional AI features for semantic search.
 
 ##  Features
 
-- **⚡ Zero Dependencies Fast Mode**: Works immediately without installing anything
-- **🤖 Optional AI Mode**: Enable semantic search with sentence transformers (better results)
-- **📚 Massive Database**: 55,000+ curated dorks from security research sources
-- **💾 Smart Caching**: Lightning-fast startup after first run
-- **🎯 Natural Language**: Convert plain English to technical Google dorks
-- **📊 Rich Output**: Beautiful markdown reports with statistics and examples
-- **🔒 Offline**: No API calls, everything runs locally
+- ** Zero Dependencies Fast Mode**: Works immediately without installing anything
+- ** Optional AI Mode**: Enable semantic search with sentence transformers (better results)
+- ** Massive Database**: 55,000+ curated dorks from security research sources
+- ** Smart Caching**: Lightning-fast startup after first run
+- ** Natural Language**: Convert plain English to technical Google dorks
+- ** Rich Output**: Beautiful markdown reports with statistics and examples
+- ** Offline**: No API calls, everything runs locally
 
 ##  Quick Start
 
@@ -128,12 +128,12 @@ Both modes produce excellent results - AI mode just ranks them slightly better!
 ```
 
 **Generated Markdown File** includes:
-- 📊 Database statistics and operator distribution
-- 🎯 Query analysis breakdown
-- 🎲 Relevant dorks from database
-- ✨ AI-generated custom dorks
-- 📖 Usage guide and examples
-- ⚠️ Legal and ethical guidelines
+-  Database statistics and operator distribution
+-  Query analysis breakdown
+-  Relevant dorks from database
+-  AI-generated custom dorks
+-  Usage guide and examples
+-  Legal and ethical guidelines
 
 ##  Advanced Usage
 
@@ -167,15 +167,15 @@ Examples:
 
 **Important Disclaimer:** This tool is intended for:
 
-- ✅ Security research on systems you own
-- ✅ Penetration testing with proper authorization  
-- ✅ Educational purposes and CTF challenges
-- ✅ Vulnerability assessment with permission
+-  Security research on systems you own
+-  Penetration testing with proper authorization  
+-  Educational purposes and CTF challenges
+-  Vulnerability assessment with permission
 
 **Never use for:**
-- ❌ Unauthorized security testing
-- ❌ Accessing systems without permission
-- ❌ Malicious or illegal activities
+-  Unauthorized security testing
+-  Accessing systems without permission
+-  Malicious or illegal activities
 
 The developers are not responsible for misuse. Always follow responsible disclosure practices and applicable laws.
 
@@ -183,26 +183,26 @@ The developers are not responsible for misuse. Always follow responsible disclos
 
 ### Common Issues & Solutions
 
-**❌ Problem:** `ModuleNotFoundError: No module named 'sentence_transformers'`
-**✅ Solution:** Use fast mode: `python main.py "query" --fast` (no dependencies needed!)
+** Problem:** `ModuleNotFoundError: No module named 'sentence_transformers'`
+** Solution:** Use fast mode: `python main.py "query" --fast` (no dependencies needed!)
 
-**❌ Problem:** `OSError: Can't find model 'en_core_web_sm'`
-**✅ Solution:** Either run `python -m spacy download en_core_web_sm` OR use fast mode
+** Problem:** `OSError: Can't find model 'en_core_web_sm'`
+** Solution:** Either run `python -m spacy download en_core_web_sm` OR use fast mode
 
-**❌ Problem:** Slow download when first running
-**✅ Solution:** The AI libraries are trying to download models. Either:
+** Problem:** Slow download when first running
+** Solution:** The AI libraries are trying to download models. Either:
 - Wait for download to complete (one-time only)
 - Press Ctrl+C and use `--fast` mode instead
 - Run `python setup_wizard.py` and choose option 1 (Fast Setup)
 
-**❌ Problem:** "No dork files found"
-**✅ Solution:** Make sure you're in the correct directory with the `data/` folder
+** Problem:** "No dork files found"
+** Solution:** Make sure you're in the correct directory with the `data/` folder
 
-**❌ Problem:** Out of memory error
-**✅ Solution:** Use fast mode - it's much more memory efficient
+** Problem:** Out of memory error
+** Solution:** Use fast mode - it's much more memory efficient
 
-**❌ Problem:** Results not relevant
-**✅ Solution:** Try:
+** Problem:** Results not relevant
+** Solution:** Try:
 - More specific queries: "wordpress wp-config.php files"
 - Increase count: `--count 50`
 - Try AI mode (if dependencies installed)
