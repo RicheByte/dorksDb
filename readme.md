@@ -4,13 +4,13 @@ A blazing-fast, intelligent tool that transforms natural language queries into t
 
 ##  Features
 
-- ** Zero Dependencies Fast Mode**: Works immediately without installing anything
-- ** Optional AI Mode**: Enable semantic search with sentence transformers (better results)
-- ** Massive Database**: 55,000+ curated dorks from security research sources
-- ** Smart Caching**: Lightning-fast startup after first run
-- ** Natural Language**: Convert plain English to technical Google dorks
-- ** Rich Output**: Beautiful markdown reports with statistics and examples
-- ** Offline**: No API calls, everything runs locally
+-  **Zero Dependencies Fast Mode** : Works immediately without installing anything
+-  **Optional AI Mode** : Enable semantic search with sentence transformers (better results)
+-  **Massive Database** : 55,000+ curated dorks from security research sources
+-  **Smart Caching** : Lightning-fast startup after first run
+-  **Natural Language** : Convert plain English to technical Google dorks
+-  **Rich Output**: Beautiful markdown reports with statistics and examples
+-  **Offline** : No API calls, everything runs locally
 
 ##  Quick Start
 
