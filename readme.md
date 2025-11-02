@@ -2,6 +2,8 @@
 
 A blazing-fast, intelligent tool that transforms natural language queries into targeted Google dorks. Works instantly with **zero dependencies** in fast mode, or use optional AI features for semantic search.
 
+![ZoEDR Dashboard](assets/dorkDb.gif)
+
 ##  Features
 
 -  **Zero Dependencies Fast Mode** : Works immediately without installing anything
@@ -136,6 +138,8 @@ Both modes produce excellent results - AI mode just ranks them slightly better!
 -  Legal and ethical guidelines
 
 ##  Advanced Usage
+
+![ZoEDR Dashboard](assets/dorkDb%20files.gif)
 
 ### Command-Line Options
 
