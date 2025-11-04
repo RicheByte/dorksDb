@@ -2,7 +2,7 @@
 
 A blazing-fast, intelligent tool that transforms natural language queries into targeted Google dorks. Works instantly with **zero dependencies** in fast mode, or use optional AI features for semantic search.
 
-![ZoEDR Dashboard](assets/dorkDb.gif)
+![demo video](assets/dorkDb.gif)
 
 ##  Features
 
@@ -71,7 +71,7 @@ The system comes pre-loaded with **55,237+** carefully curated Google dorks:
 | `index of` dorks | 105 |
 
 ##  Project Structure
-
+![All the data](assets/data.png)
 ```
 dorksDb/
 ├── main.py                  # CLI interface
